@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import copy
 import datetime
+import typing
 
 import pytest
+from django.db.models import TextChoices
 from pydantic import BaseModel, Field, StrictInt, StrictStr
 
 from restdoctor.rest_framework.schema.generators import RefsSchemaGenerator
 from restdoctor.rest_framework.schema.openapi import RestDoctorSchema
-from restdoctor.rest_framework.schema.serializers import OPENAPI_REF_PREFIX
+from restdoctor.rest_framework.schema.serializers import (
+    OPENAPI_REF_PREFIX,
+    pydantic_schema_to_request_filter_parameters,
+)
 from restdoctor.rest_framework.serializers import PydanticSerializer
 
 
@@ -32,6 +37,11 @@ class NestedPydanticTestSerializer(PydanticSerializer):
     pydantic_model = PydanticNestedTestModel
 
 
+class PydanticRequestParamsTestModel(BaseModel):
+    field_a: StrictStr = Field(title='field_a', description='Field A')
+    field_b: StrictInt | None = Field(None, title='field_b', description='Field B')
+
+
 @pytest.fixture()
 def test_model_schema():
     return {
@@ -45,6 +55,24 @@ def test_model_schema():
         },
         'required': ['field_a', 'field_b', 'title'],
     }
+
+
+@pytest.fixture()
+def pydantic_request_params_test_model_as_request_parameters():
+    return [
+        {
+            'name': 'field_a',
+            'required': True,
+            'in': 'query',
+            'schema': {'description': 'Field A', 'type': 'string'},
+        },
+        {
+            'name': 'field_b',
+            'required': False,
+            'in': 'query',
+            'schema': {'description': 'Field B', 'type': 'integer'},
+        },
+    ]
 
 
 @pytest.fixture()
@@ -117,3 +145,13 @@ def test_map_serializer_with_refs_generator_with_nested_serializer_success_case(
         == test_nested_model_schema_without_definitions
     )
     assert schema_generator.local_refs_registry.get_local_ref(nested_ref) == test_model_schema
+
+
+def test_pydantic_schema_to_request_filter_parameters(
+    pydantic_request_params_test_model_as_request_parameters,
+):
+    schema = PydanticRequestParamsTestModel.schema()
+
+    request_parameters_schema = pydantic_schema_to_request_filter_parameters(schema)
+
+    assert request_parameters_schema == pydantic_request_params_test_model_as_request_parameters

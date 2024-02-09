@@ -20,7 +20,9 @@ from restdoctor.rest_framework.pagination.mixins import SerializerClassPaginatio
 from restdoctor.rest_framework.schema.custom_types import SchemaGenerator, ViewSchemaBase
 from restdoctor.rest_framework.schema.fields import FieldSchema
 from restdoctor.rest_framework.schema.filters import get_filter_schema
-from restdoctor.rest_framework.schema.serializers import SerializerSchema
+from restdoctor.rest_framework.schema.serializers import (
+    SerializerSchema, pydantic_schema_to_request_filter_parameters
+)
 from restdoctor.rest_framework.schema.utils import (
     get_action,
     get_action_code_schemas_from_map,
@@ -28,7 +30,7 @@ from restdoctor.rest_framework.schema.utils import (
     get_app_prefix,
     normalize_action_schema,
 )
-from restdoctor.rest_framework.serializers import EmptySerializer
+from restdoctor.rest_framework.serializers import EmptySerializer, PydanticSerializer
 from restdoctor.rest_framework.views import SerializerClassMapApiView
 
 if typing.TYPE_CHECKING:
@@ -137,6 +139,12 @@ class RestDoctorSchema(ViewSchemaBase, AutoSchema):
         parameters = []
         request_serializer_class = self.view.get_request_serializer_class(use_default=False)
         request_serializer = request_serializer_class()
+
+        if isinstance(request_serializer, PydanticSerializer):
+            return pydantic_schema_to_request_filter_parameters(
+                request_serializer.pydantic_model_class.schema()
+            )
+
         if not isinstance(request_serializer, EmptySerializer):
             for field in request_serializer.fields.values():
                 field_schema = self.field_schema.get_field_schema(field)
